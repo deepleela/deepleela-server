@@ -52,6 +52,7 @@
     "node": ">=8.9"
   },
   "dependencies": {
+    "@sabaki/gtp": "^1.1.0",
     "sha.js": "^2.4.10"
   },
   "devDependencies": {
