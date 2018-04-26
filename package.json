@@ -53,9 +53,13 @@
   },
   "dependencies": {
     "@sabaki/gtp": "^1.1.0",
-    "sha.js": "^2.4.10"
+    "sha.js": "^2.4.10",
+    "winston": "^2.4.2",
+    "ws": "^5.1.1"
   },
   "devDependencies": {
+    "@types/winston": "^2.3.9",
+    "@types/ws": "^4.0.2",
     "ava": "^1.0.0-beta.3",
     "codecov": "^3.0.0",
     "cz-conventional-changelog": "^2.1.0",

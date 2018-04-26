@@ -1,0 +1,8 @@
+{
+    "listen": 3301,
+    "leela": {
+        "exec": "/path-to-leela",
+        "weights": "/weights-file-path",
+        "playouts": 200
+    }
+}
