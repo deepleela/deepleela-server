@@ -1,6 +1,7 @@
 import { Command } from "@sabaki/gtp";
 
 export type GTPCommands = 'name' | 'version' | 'protocol_version' | 'known_command';
+export type Color = 'B' | 'W';
 
 export default class CommandBuilder {
 
@@ -52,11 +53,11 @@ export default class CommandBuilder {
         return { name: 'set_free_handicap', args: [numberOfStones] };
     }
 
-    static play(move): Command {
-        return { name: 'play', args: [move] };
+    static play(color: Color, move: string): Command {
+        return { name: 'play', args: [color, move] };
     }
 
-    static genmove(color: 'B' | 'W'): Command {
+    static genmove(color: Color): Command {
         return { name: 'genmove', args: [color] };
     }
 
@@ -68,7 +69,7 @@ export default class CommandBuilder {
         return { name: 'time_settings', args: [main, byo_yomi_seconds, byo_yomi_stones] };
     }
 
-    static time_left(color: 'B' | 'W', time: number, stones: number): Command {
+    static time_left(color: Color, time: number, stones: number): Command {
         return { name: 'time_left', args: [color, time, stones] };
     }
 
