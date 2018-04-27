@@ -6,7 +6,8 @@ import * as os from 'os';
 import * as cluster from 'cluster';
 import * as fs from 'fs';
 import * as winston from 'winston';
-import GoServer, { LeelaConfiguration } from './lib/GoServer';
+import GoServer from './lib/GoServer';
+import AIManager, { LeelaConfiguration } from './lib/AIManager';
 
 type Configuration = {
     listen: number,
@@ -52,9 +53,12 @@ if (cluster.isMaster) {
     const config = JSON.parse(fs.readFileSync('./config.json').toString()) as Configuration;
     const players = (config.max_players || cpus) / cpus;
 
+    AIManager.maxInstances = players;
+    AIManager.configs = config.leela;
+
     const server = new ws.Server({ port: config.listen || 3301 });
     server.on('connection', (client) => {
-        new GoServer(client as any, config.leela);
+        new GoServer(client as any);
     });
 }
 

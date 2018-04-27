@@ -1,24 +1,14 @@
 import * as WebSocket from 'ws';
-import { } from '@sabaki/gtp';
+import { Command } from '@sabaki/gtp';
 import { EventEmitter } from 'events';
-
-export type LeelaConfiguration = {
-    exec: string,
-    weights: string,
-    playouts: number,
-};
-
-export interface Protocol {
-    type: 'gtp' | 'sys',
-    data: any;
-}
+import { Protocol, ProtocolDef } from 'deepleela-common';
 
 export default class GoServer extends EventEmitter {
 
     private client: WebSocket;
     private keepaliveTimer: NodeJS.Timer;
 
-    constructor(client: WebSocket, leela: LeelaConfiguration) {
+    constructor(client: WebSocket) {
         super();
         this.client = client;
 
@@ -30,15 +20,24 @@ export default class GoServer extends EventEmitter {
     }
 
     private handleMessage(data: WebSocket.Data) {
-        let msg: Protocol = null;
+        let msg: ProtocolDef = null;
 
         try {
-            msg = JSON.parse(data.toString()) as Protocol;
+            msg = JSON.parse(data.toString()) as ProtocolDef;
+
             if (!msg.type) {
                 this.close();
                 return;
             }
 
+            switch (msg.type) {
+                case 'gtp':
+                    this.handleGtpMessages(msg.data);
+                    break;
+                case 'sys':
+                    this.handleSysMessages(msg.data);
+                    break;
+            }
 
         } catch (error) {
             this.close();
@@ -60,8 +59,16 @@ export default class GoServer extends EventEmitter {
     private close() {
         clearInterval(this.keepaliveTimer);
         super.emit('close', this);
-        
+
         this.client.terminate();
         this.client.removeAllListeners();
+    }
+
+    private handleSysMessages(cmd: Command) {
+
+    }
+
+    private handleGtpMessages(cmd: Command) {
+
     }
 }

@@ -5,7 +5,7 @@
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
   "module": "build/module/index.js",
-  "repository": "https://github.com/UnsignedInt8/deepleela-server",
+  "repository": "https://github.com/deepleela/deepleela-server",
   "license": "MIT",
   "keywords": [],
   "scripts": {
@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@sabaki/gtp": "^1.1.0",
+    "deepleela-common": "github:deepleela/deepleela-common",
     "sha.js": "^2.4.10",
     "winston": "^2.4.2",
     "ws": "^5.1.1"
