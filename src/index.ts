@@ -6,10 +6,11 @@ import * as os from 'os';
 import * as cluster from 'cluster';
 import * as fs from 'fs';
 import * as winston from 'winston';
-import { LeelaConfiguration } from './lib/GoServer';
+import GoServer, { LeelaConfiguration } from './lib/GoServer';
 
 type Configuration = {
     listen: number,
+    max_players: number,
     leela: LeelaConfiguration,
 };
 
@@ -31,23 +32,30 @@ async function main() {
 
 // main();
 
+const cpus = os.cpus().length;
+
 function forkSelf() {
     let worker = cluster.fork();
     worker.once('exit', (code, signal) => forkSelf());
 }
 
 if (cluster.isMaster) {
-    for (let i = 0; i < os.cpus().length; i++) {
+    for (let i = 0; i < cpus; i++) {
         forkSelf();
     }
 } else {
     if (!fs.existsSync('./config.json')) {
-        winston.error('The configuration file not exists, try to copy config.json.example to config.json.');
+        winston.error('The configuration file does not exist, copy config.json.example to config.json, and try agian.');
         process.exit(-1);
     }
 
-    let config = JSON.parse(fs.readFileSync('./config.json').toString()) as Configuration;
-    let server = new ws.Server({ port: config.listen || 3301 });
+    const config = JSON.parse(fs.readFileSync('./config.json').toString()) as Configuration;
+    const players = (config.max_players || cpus) / cpus;
+
+    const server = new ws.Server({ port: config.listen || 3301 });
+    server.on('connection', (client) => {
+        new GoServer(client as any, config.leela);
+    });
 }
 
 process.title = `deepleela-server-${cluster.isMaster ? 'master' : 'worker'}`;

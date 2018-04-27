@@ -1,5 +1,6 @@
-import * as ws from 'ws';
+import * as WebSocket from 'ws';
 import { } from '@sabaki/gtp';
+import { EventEmitter } from 'events';
 
 export type LeelaConfiguration = {
     exec: string,
@@ -7,26 +8,60 @@ export type LeelaConfiguration = {
     playouts: number,
 };
 
-export default class GoServer {
+export interface Protocol {
+    type: 'gtp' | 'sys',
+    data: any;
+}
 
-    private client: ws;
+export default class GoServer extends EventEmitter {
 
-    constructor(client: ws) {
+    private client: WebSocket;
+    private keepaliveTimer: NodeJS.Timer;
+
+    constructor(client: WebSocket, leela: LeelaConfiguration) {
+        super();
         this.client = client;
-        this.client.on('message', this.onMessage.bind(this));
-        this.client.on('close', this.onClose.bind(this));
-        this.client.on('error', this.onError.bind(this));
+
+        this.client.on('message', this.handleMessage.bind(this));
+        this.client.on('close', this.handleClose.bind(this));
+        this.client.on('error', this.handleError.bind(this));
+
+        this.keepaliveTimer = setInterval(() => this.client.ping(), 15 * 1000);
     }
 
-    private onMessage(client: ws, data: ws.Data) {
+    private handleMessage(data: WebSocket.Data) {
+        let msg: Protocol = null;
 
+        try {
+            msg = JSON.parse(data.toString()) as Protocol;
+            if (!msg.type) {
+                this.close();
+                return;
+            }
+
+
+        } catch (error) {
+            this.close();
+        }
     }
 
-    private onClose(client: ws, code: number, reason: string) {
-
+    private handleClose(code: number, reason: string) {
+        this.close();
     }
 
-    private onError(client: ws, error: Error) {
+    private handleError(error: Error) {
+        this.close();
+    }
 
+    onClose(callback: (sender: GoServer) => void) {
+        super.addListener('close', callback);
+    }
+
+    private close() {
+        clearInterval(this.keepaliveTimer);
+        super.emit('close', this);
+        
+        this.client.terminate();
+        this.client.removeAllListeners();
     }
 }
