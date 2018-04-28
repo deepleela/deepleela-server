@@ -58,6 +58,8 @@ if (cluster.isMaster) {
 
     const server = new ws.Server({ port: config.listen || 3301 });
     server.on('connection', (client) => {
+        AIManager.onlineUsers++;
+        client.once('close', () => AIManager.onlineUsers--);
         new GoServer(client as any);
     });
 }

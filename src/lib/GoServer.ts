@@ -1,12 +1,15 @@
 import * as WebSocket from 'ws';
-import { Command } from '@sabaki/gtp';
+import { Command, Controller, Response } from '@sabaki/gtp';
 import { EventEmitter } from 'events';
 import { Protocol, ProtocolDef } from 'deepleela-common';
+import AIManager from './AIManager';
 
 export default class GoServer extends EventEmitter {
 
     private client: WebSocket;
     private keepaliveTimer: NodeJS.Timer;
+    private ai: Controller;
+    private sysHanlders: Map<string, Function>;
 
     constructor(client: WebSocket) {
         super();
@@ -17,6 +20,8 @@ export default class GoServer extends EventEmitter {
         this.client.on('error', this.handleError.bind(this));
 
         this.keepaliveTimer = setInterval(() => this.client.ping(), 15 * 1000);
+
+        this.sysHanlders = new Map([[Protocol.sys.requestAI, this.handleRequestAI]]);
     }
 
     private handleMessage(data: WebSocket.Data) {
@@ -62,10 +67,44 @@ export default class GoServer extends EventEmitter {
 
         this.client.terminate();
         this.client.removeAllListeners();
+
+        if (!this.ai) return;
+        AIManager.releaseController(this.ai);
+        this.ai = null;
+    }
+
+    sendSysResponse(cmd: Command) {
+        let msg: ProtocolDef = { type: 'sys', data: cmd };
+        this.client.send(JSON.stringify(msg));
+    }
+
+    sendGtpResponse(resp: Response) {
+        let msg: ProtocolDef = { type: 'gtp', data: resp };
+        this.client.send(JSON.stringify(msg));
     }
 
     private handleSysMessages(cmd: Command) {
+        let handler = this.sysHanlders.get(cmd.name);
+        if (!handler) return;
+        handler(cmd);
+    }
 
+    private handleRequestAI = (cmd: Command) => {
+        let ai = AIManager.createController();
+
+        if (!ai) {
+            let pending = Math.max(AIManager.onlineUsers - AIManager.maxInstances, 0);
+            this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [false, pending] });
+            return;
+        }
+
+        ai.on('stopped', () => { AIManager.releaseController(ai), this.ai = null });
+        ai.start();
+
+        this.ai = ai;
+
+        console.log(ai);
+        this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [ai.process != null, 0] });
     }
 
     private handleGtpMessages(cmd: Command) {

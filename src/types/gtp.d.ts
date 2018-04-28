@@ -10,6 +10,7 @@ declare module '@sabaki/gtp' {
     }
 
     export class Command {
+        id?: number;
         name: string;
         args?: any;
         static fromString(input: string);
