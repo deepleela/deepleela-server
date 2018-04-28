@@ -79,7 +79,7 @@ export default class GoServer extends EventEmitter {
     }
 
     sendGtpResponse(resp: Response) {
-        let msg: ProtocolDef = { type: 'gtp', data: resp };
+        let msg: ProtocolDef = { type: 'gtp', data: Response.toString(resp) };
         this.client.send(JSON.stringify(msg));
     }
 
@@ -90,6 +90,11 @@ export default class GoServer extends EventEmitter {
     }
 
     private handleRequestAI = (cmd: Command) => {
+        if (this.ai && this.ai.process) {
+            this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [true, 0] });
+            return;
+        }
+
         let ai = AIManager.createController();
 
         if (!ai) {
@@ -103,11 +108,14 @@ export default class GoServer extends EventEmitter {
 
         this.ai = ai;
 
-        console.log(ai);
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [ai.process != null, 0] });
     }
 
-    private handleGtpMessages(cmd: Command) {
+    private async handleGtpMessages(cmdstr: string) {
+        if (!this.ai) return;
 
+        let cmd = Command.fromString(cmdstr);
+        let res = await this.ai.sendCommand(cmd);
+        this.sendGtpResponse(res);
     }
 }
