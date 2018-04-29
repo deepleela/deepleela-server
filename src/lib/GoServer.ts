@@ -95,7 +95,7 @@ export default class GoServer extends EventEmitter {
             return;
         }
 
-        let ai = AIManager.createController();
+        let ai = AIManager.createController(cmd.args);
 
         if (!ai) {
             let pending = Math.max(AIManager.onlineUsers - AIManager.maxInstances, 0);
@@ -103,7 +103,7 @@ export default class GoServer extends EventEmitter {
             return;
         }
 
-        ai.on('stopped', () => { AIManager.releaseController(ai), this.ai = null });
+        ai.on('stopped', (args) => { AIManager.releaseController(ai), this.ai = null, console.log(args) });
         ai.start();
 
         this.ai = ai;
@@ -113,9 +113,9 @@ export default class GoServer extends EventEmitter {
 
     private async handleGtpMessages(cmdstr: string) {
         if (!this.ai) return;
-
         let cmd = Command.fromString(cmdstr);
         let res = await this.ai.sendCommand(cmd);
+        console.log(cmdstr, res);
         this.sendGtpResponse(res);
     }
 }

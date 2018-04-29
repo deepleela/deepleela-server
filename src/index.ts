@@ -12,7 +12,8 @@ import AIManager, { LeelaConfiguration } from './lib/AIManager';
 type Configuration = {
     listen: number,
     max_players: number,
-    leela: LeelaConfiguration,
+    leela?: LeelaConfiguration,
+    leelazero?: LeelaConfiguration,
 };
 
 async function main() {
@@ -54,7 +55,7 @@ if (cluster.isMaster) {
     const players = (config.max_players || cpus) / cpus;
 
     AIManager.maxInstances = players;
-    AIManager.configs = config.leela;
+    AIManager.configs = new Map([['leela', config.leela], ['leelazero', config.leelazero]]);
 
     const server = new ws.Server({ port: config.listen || 3301 });
     server.on('connection', (client) => {

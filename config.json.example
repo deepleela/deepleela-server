@@ -3,7 +3,11 @@
     "max_players": 20,
     "leela": {
         "exec": "/path-to-leela",
-        "weights": "/weights-file-path",
+        "playouts": 200
+    },
+    "leelazero": {
+        "exec": "/path-to-leelazero",
+        "weights": "/path-to-weights",
         "playouts": 200
     }
 }
