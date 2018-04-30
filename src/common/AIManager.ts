@@ -15,11 +15,11 @@ export default class AIManager {
     static onlineUsers = 0;
     private static readonly controllers = new Set<Controller>();
 
-    static createController(engine: string = 'leela') {
+    static createController(ai: string = 'leela') {
         
-        engine = engine ? engine.toLowerCase() : 'leela';
+        ai = ai ? ai.toLowerCase() : 'leela';
         if (AIManager.controllers.size >= AIManager.maxInstances) return null;
-        if (!AIManager.configs.has(engine)) return null;
+        if (!AIManager.configs.has(ai)) return null;
 
         let leelaConfigs = AIManager.configs.get('leela');
         let leelaArgs = ['--gtp', '--noponder'];
@@ -34,11 +34,11 @@ export default class AIManager {
         }
 
         let argsMap = new Map([['leela', leelaArgs], ['leelazero', leelazeroArgs]]);
-        console.log(argsMap.get(engine));
-        let ai = new Controller(AIManager.configs.get(engine).exec, argsMap.get(engine) || []);
-        AIManager.controllers.add(ai);
+        
+        let engine = new Controller(AIManager.configs.get(ai).exec, argsMap.get(ai) || []);
+        AIManager.controllers.add(engine);
 
-        return ai;
+        return engine;
     }
 
     static async releaseController(controller: Controller) {

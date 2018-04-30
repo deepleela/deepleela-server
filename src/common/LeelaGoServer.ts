@@ -3,14 +3,18 @@ import { Command, Controller, Response } from '@sabaki/gtp';
 import { EventEmitter } from 'events';
 import { Protocol, ProtocolDef } from 'deepleela-common';
 import AIManager from './AIManager';
+import ReadableLogger from '../lib/ReadableLogger';
+import LineReadable from '../lib/LineReadable';
 
 export default class LeelaGoServer extends EventEmitter {
 
     private client: WebSocket;
     private keepaliveTimer: NodeJS.Timer;
-    private ai: Controller;
-    private engine: string;
+    private engine: Controller;
+    private ai: string;
     private sysHanlders: Map<string, Function>;
+
+    private engineLogger: ReadableLogger;
 
     constructor(client: WebSocket) {
         super();
@@ -69,9 +73,9 @@ export default class LeelaGoServer extends EventEmitter {
         this.client.terminate();
         this.client.removeAllListeners();
 
-        if (!this.ai) return;
-        AIManager.releaseController(this.ai);
-        this.ai = null;
+        if (!this.engine) return;
+        AIManager.releaseController(this.engine);
+        this.engine = null;
     }
 
     sendSysResponse(cmd: Command) {
@@ -91,13 +95,13 @@ export default class LeelaGoServer extends EventEmitter {
     }
 
     private handleRequestAI = (cmd: Command) => {
-        if (this.ai && this.ai.process && cmd.args === this.engine) {
+        if (this.engine && this.engine.process && cmd.args === this.ai) {
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [true, 0] });
             return;
         }
 
-        AIManager.releaseController(this.ai);
-        this.ai = null;
+        AIManager.releaseController(this.engine);
+        this.engine = null;
 
         let ai = AIManager.createController(cmd.args);
 
@@ -109,18 +113,25 @@ export default class LeelaGoServer extends EventEmitter {
 
         ai.on('stopped', (args) => { AIManager.releaseController(ai), console.info(cmd.args, 'exists') });
         ai.start();
-        ai.process.stderr.on('data', chunk => console.log(chunk.toString('utf8')));
 
-        this.ai = ai;
-        this.engine = ai.process != null ? cmd.args : undefined;
-        this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [ai.process != null, 0] });
+        let success = ai.process != null;
+        this.engine = success ? ai : null;
+        this.ai = success ? cmd.args : undefined;
+
+        if (success) {
+            let readableStderr = new LineReadable(ai.process.stderr);
+            this.engineLogger = new ReadableLogger(readableStderr);
+        }
+
+        this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [success, 0] });
     }
 
     private async handleGtpMessages(cmdstr: string) {
-        if (!this.ai) return;
+        if (!this.engine) return;
         let cmd = Command.fromString(cmdstr);
-        let res = await this.ai.sendCommand(cmd);
-        console.log(cmdstr, res);
+
+        let res = await this.engine.sendCommand(cmd);
+        
         this.sendGtpResponse(res);
     }
 }

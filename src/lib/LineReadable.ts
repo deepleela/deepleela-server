@@ -1,15 +1,15 @@
 // Code from LeelaSabaki src/LineReadable.js
 
 import { EventEmitter } from "events";
-import { Readable } from "stream";
+import { Readable, Stream } from "stream";
 
-export default class LineReader extends EventEmitter {
+export default class LineReadable extends EventEmitter {
 
     buffer = '';
-    readable: Readable;
+    readable: Stream;
     newline: string;
 
-    constructor(readable: Readable, { newline = '\n' } = {}) {
+    constructor(readable: Stream, { newline = '\n' } = {}) {
         super();
         this.readable = readable;
         this.newline = newline;
