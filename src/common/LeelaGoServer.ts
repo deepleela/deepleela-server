@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 import { Protocol, ProtocolDef } from 'deepleela-common';
 import AIManager from './AIManager';
 
-export default class GoServer extends EventEmitter {
+export default class LeelaGoServer extends EventEmitter {
 
     private client: WebSocket;
     private keepaliveTimer: NodeJS.Timer;
@@ -58,7 +58,7 @@ export default class GoServer extends EventEmitter {
         this.close();
     }
 
-    onClose(callback: (sender: GoServer) => void) {
+    onClose(callback: (sender: LeelaGoServer) => void) {
         super.addListener('close', callback);
     }
 
@@ -107,8 +107,9 @@ export default class GoServer extends EventEmitter {
             return;
         }
 
-        ai.on('stopped', (args) => { AIManager.releaseController(ai), console.error(cmd.args, args) });
+        ai.on('stopped', (args) => { AIManager.releaseController(ai), console.info(cmd.args, 'exists') });
         ai.start();
+        ai.process.stderr.on('data', chunk => console.log(chunk.toString('utf8')));
 
         this.ai = ai;
         this.engine = ai.process != null ? cmd.args : undefined;

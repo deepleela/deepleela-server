@@ -1,13 +1,13 @@
 import { Controller, Command, Response } from '@sabaki/gtp';
 import { spawn } from 'child_process';
-import CommandBuilder from './lib/CommandBuilder';
+import CommandBuilder from './common/CommandBuilder';
 import * as ws from 'ws';
 import * as os from 'os';
 import * as cluster from 'cluster';
 import * as fs from 'fs';
 import * as winston from 'winston';
-import GoServer from './lib/GoServer';
-import AIManager, { LeelaConfiguration } from './lib/AIManager';
+import LeelaGoServer from './common/LeelaGoServer';
+import AIManager, { LeelaConfiguration } from './common/AIManager';
 
 type Configuration = {
     listen: number,
@@ -61,7 +61,7 @@ if (cluster.isMaster) {
     server.on('connection', (client) => {
         AIManager.onlineUsers++;
         client.once('close', () => AIManager.onlineUsers--);
-        new GoServer(client as any);
+        new LeelaGoServer(client as any);
     });
 }
 
