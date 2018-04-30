@@ -5,6 +5,7 @@ import { Protocol, ProtocolDef } from 'deepleela-common';
 import AIManager from './AIManager';
 import ReadableLogger from '../lib/ReadableLogger';
 import LineReadable from '../lib/LineReadable';
+import CommandBuilder from './CommandBuilder';
 
 export default class LeelaGoServer extends EventEmitter {
 
@@ -14,6 +15,7 @@ export default class LeelaGoServer extends EventEmitter {
     private ai: string;
     private sysHanlders: Map<string, Function>;
 
+    private stderrReadable: LineReadable;
     private engineLogger: ReadableLogger;
 
     constructor(client: WebSocket) {
@@ -119,19 +121,75 @@ export default class LeelaGoServer extends EventEmitter {
         this.ai = success ? cmd.args : undefined;
 
         if (success) {
-            let readableStderr = new LineReadable(ai.process.stderr);
-            this.engineLogger = new ReadableLogger(readableStderr);
+            this.stderrReadable = new LineReadable(ai.process.stderr);
+            this.engineLogger = new ReadableLogger(this.stderrReadable);
         }
 
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [success, 0] });
     }
 
     private async handleGtpMessages(cmdstr: string) {
-        if (!this.engine) return;
+        if (!this.engine || !this.engineLogger) return;
+
         let cmd = Command.fromString(cmdstr);
 
+        if (['heatmap', 'genmove'].includes(cmd.name)) {
+            this.engineLogger.start();
+            try {
+                switch (cmd.name) {
+                    case 'heatmap':
+                        await this.genHeatmap(cmd.id);
+                        return;
+                    case 'genmove':
+                        await this.genVariations(cmd.id);
+                        break;
+                }
+            } finally {
+                this.engineLogger.stop();
+            }
+        }
+
         let res = await this.engine.sendCommand(cmd);
-        
         this.sendGtpResponse(res);
+    }
+
+    private async genHeatmap(id?: number) {
+        let heatmap = new Promise(resolve => {
+            let counter = 19;
+            let dataHandler = (chunk: string) => {
+                if (chunk.match(/^\s*(\d+\s+)+$/) != null) {
+                    counter--;
+                }
+
+                if (counter === 0) {
+                    this.stderrReadable.removeListener('data', dataHandler);
+                    resolve();
+                }
+            }
+
+            this.stderrReadable.on('data', dataHandler);
+        });
+
+        await Promise.all([
+            heatmap,
+            this.engine.sendCommand(CommandBuilder.leela_heatmap())
+        ]);
+
+        let log = this.engineLogger.log;
+
+        let lines = log.split('\n');
+
+        let startIndex = lines.findIndex(line => line.match(/^\s*(\d+\s+)+$/) != null);
+        if (startIndex < 0) startIndex = lines.length;
+
+        let data = lines.slice(startIndex, startIndex + 19).map(line => line.trim().split(/\s+/).map(x => +x));
+        let max = Math.max(...data.map(x => Math.max(...x)));
+        let result = data.map(x => x.map(y => Math.floor(y * 9.9 / max)));
+
+        this.sendSysResponse({ name: 'heatmap', id, args: JSON.stringify(result) });
+    }
+
+    private async genVariations(id?: number) {
+
     }
 }

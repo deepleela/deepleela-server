@@ -12,9 +12,9 @@ export default class ReadableLogger {
     constructor(readable: LineReadable) {
         this.readable = readable;
 
-        readable.on('data', chunk => {
+        readable.on('data', (chunk: string) => {
             if (!this.enabled) return;
-            this.log += (chunk as string).replace(/\r/g, '');
+            this.log += chunk.replace(/\r/g, '');
         });
     }
 
