@@ -11,11 +11,18 @@ export default class ReadableLogger {
 
     constructor(readable: LineReadable) {
         this.readable = readable;
+        readable.on('data', this.dataHandler);
+    }
 
-        readable.on('data', (chunk: string) => {
-            if (!this.enabled) return;
-            this.log += chunk.replace(/\r/g, '');
-        });
+    private dataHandler = (chunk: string) => {
+        if (!this.enabled) return;
+        this.log += chunk.replace(/\r/g, '');
+    }
+
+    release() {
+        if (!this.readable) return;
+        this.readable.removeListener('data', this.dataHandler);
+        this.readable = null;
     }
 
     start() {

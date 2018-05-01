@@ -14,16 +14,25 @@ export default class LineReadable extends EventEmitter {
         this.readable = readable;
         this.newline = newline;
 
-        readable.on('data', chunk => {
-            this.buffer += (chunk + '').replace(/\r/g, '');
+        readable.on('data', this.dataHandler);
+    }
 
-            let newlineIndex = this.buffer.lastIndexOf(newline);
-            if (newlineIndex < 0) return;
+    private dataHandler = (chunk: string | Buffer) => {
 
-            let lines = this.buffer.slice(0, newlineIndex).split(newline);
-            lines.forEach(line => this.emit('data', line + newline));
-            
-            this.buffer = this.buffer.slice(newlineIndex + newline.length);
-        });
+        this.buffer += (chunk + '').replace(/\r/g, '');
+
+        let newlineIndex = this.buffer.lastIndexOf(this.newline);
+        if (newlineIndex < 0) return;
+
+        let lines = this.buffer.slice(0, newlineIndex).split(this.newline);
+        lines.forEach(line => this.emit('data', line + this.newline));
+
+        this.buffer = this.buffer.slice(newlineIndex + this.newline.length);
+    }
+
+    release() {
+        if (!this.readable) return;
+        this.readable.removeListener('data', this.dataHandler);
+        this.readable = null;
     }
 }

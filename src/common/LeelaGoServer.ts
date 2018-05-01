@@ -6,6 +6,7 @@ import AIManager from './AIManager';
 import ReadableLogger from '../lib/ReadableLogger';
 import LineReadable from '../lib/LineReadable';
 import CommandBuilder from './CommandBuilder';
+import { coord2point } from '../lib/CoordHelper';
 
 export default class LeelaGoServer extends EventEmitter {
 
@@ -81,11 +82,13 @@ export default class LeelaGoServer extends EventEmitter {
     }
 
     sendSysResponse(cmd: Command) {
+        if (this.client.readyState !== this.client.OPEN) return;
         let msg: ProtocolDef = { type: 'sys', data: cmd };
         this.client.send(JSON.stringify(msg));
     }
 
     sendGtpResponse(resp: Response) {
+        if (this.client.readyState !== this.client.OPEN) return;
         let msg: ProtocolDef = { type: 'gtp', data: Response.toString(resp) };
         this.client.send(JSON.stringify(msg));
     }
@@ -104,6 +107,8 @@ export default class LeelaGoServer extends EventEmitter {
 
         AIManager.releaseController(this.engine);
         this.engine = null;
+        if (this.engineLogger) this.engineLogger.release();
+        if (this.stderrReadable) this.stderrReadable.release();
 
         let ai = AIManager.createController(cmd.args);
 
@@ -135,18 +140,18 @@ export default class LeelaGoServer extends EventEmitter {
 
         if (['heatmap', 'genmove'].includes(cmd.name)) {
             this.engineLogger.start();
-            try {
-                switch (cmd.name) {
-                    case 'heatmap':
-                        await this.genHeatmap(cmd.id);
-                        return;
-                    case 'genmove':
-                        await this.genVariations(cmd.id);
-                        break;
-                }
-            } finally {
-                this.engineLogger.stop();
+
+            switch (cmd.name) {
+                case 'heatmap':
+                    await this.genHeatmap(cmd.id);
+                    break;
+                case 'genmove':
+                    await this.genMove(cmd);
+                    break;
             }
+
+            this.engineLogger.stop();
+            return;
         }
 
         let res = await this.engine.sendCommand(cmd);
@@ -189,7 +194,36 @@ export default class LeelaGoServer extends EventEmitter {
         this.sendSysResponse({ name: 'heatmap', id, args: JSON.stringify(result) });
     }
 
-    private async genVariations(id?: number) {
+    private async genMove(cmd: Command) {
+        let res = await this.engine.sendCommand(cmd);
+        let respstr = Response.toString(res);
 
+        let log = this.engineLogger.log;
+
+        let lines = log.split('\n');
+
+        let startIndex = lines.findIndex(line => line.includes('MC winrate=') || line.includes('NN eval='));
+        if (startIndex < 0) startIndex = lines.length;
+
+        let colors = [cmd.args[0], cmd.args[0] === 'B' ? 'W' : 'B'];
+
+        let variations = lines
+            .slice(startIndex)
+            .filter(line => line.includes('->'))
+            .map(line => ({
+                visits: +line.slice(line.indexOf('->') + 2, line.indexOf('(')).trim(),
+                stats: line.slice(line.indexOf('('), line.indexOf('PV: ')).trim()
+                    .replace(/\s+/g, ' ').slice(1, -1).split(') (')
+                    .reduce((acc, x) => Object.assign(acc, { [x[0]]: x.slice(x.indexOf(':') + 2) }), {}),
+                variation: line.slice(line.indexOf('PV: ') + 4).trim().split(/\s+/)
+            }));
+
+
+        let result = {
+            respstr,
+            variations
+        };
+        
+        this.sendSysResponse({ name: 'genmove', id: cmd.id!, args: JSON.stringify(result) });
     }
 }
