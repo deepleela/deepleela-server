@@ -118,7 +118,7 @@ export default class LeelaGoServer extends EventEmitter {
             return;
         }
 
-        ai.on('stopped', (args) => { AIManager.releaseController(ai), console.info(cmd.args, 'exists') });
+        ai.on('stopped', (args) => { AIManager.releaseController(ai), console.info(cmd.args, 'exits') });
         ai.start();
 
         let success = ai.process != null;
