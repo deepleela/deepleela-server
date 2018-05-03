@@ -57,7 +57,7 @@ if (cluster.isMaster) {
     AIManager.maxInstances = players;
     AIManager.configs = new Map([['leela', config.leela], ['leelazero', config.leelazero]]);
 
-    const server = new ws.Server({ port: config.listen || 3301 });
+    const server = new ws.Server({ port: config.listen || 3301, host: 'localhost' });
     server.on('connection', (client) => {
         AIManager.onlineUsers++;
         client.once('close', () => AIManager.onlineUsers--);
