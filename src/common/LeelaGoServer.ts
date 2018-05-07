@@ -31,7 +31,7 @@ export default class LeelaGoServer extends EventEmitter {
 
         this.sysHanlders = new Map([
             [Protocol.sys.requestAI, this.handleRequestAI],
-            [Protocol.sys.loadSgf, this.handleLoadsgf],
+            [Protocol.sys.loadMoves, this.handleLoadMoves],
         ]);
     }
 
@@ -136,7 +136,7 @@ export default class LeelaGoServer extends EventEmitter {
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [success, 0] });
     }
 
-    private handleLoadsgf = (cmd: Command) => {
+    private handleLoadMoves = (cmd: Command) => {
         let moves = cmd.args as [string, string][];
         if (!moves || moves.length === 0) {
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'bad moves' });
