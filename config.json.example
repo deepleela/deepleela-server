@@ -1,6 +1,7 @@
 {
     "listen": 3301,
-    "max_players": 20,
+    "host": "localhost",
+    "max_players": 30,
     "leela": {
         "exec": "/path-to-leela",
         "playouts": 200 // optional

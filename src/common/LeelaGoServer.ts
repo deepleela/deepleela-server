@@ -5,7 +5,7 @@ import { Protocol, ProtocolDef } from 'deepleela-common';
 import AIManager from './AIManager';
 import ReadableLogger from '../lib/ReadableLogger';
 import LineReadable from '../lib/LineReadable';
-import CommandBuilder from './CommandBuilder';
+import CommandBuilder, { StoneColor } from './CommandBuilder';
 import { coord2point } from '../lib/CoordHelper';
 
 export default class LeelaGoServer extends EventEmitter {
@@ -29,7 +29,10 @@ export default class LeelaGoServer extends EventEmitter {
 
         this.keepaliveTimer = setInterval(() => this.client.ping(), 15 * 1000);
 
-        this.sysHanlders = new Map([[Protocol.sys.requestAI, this.handleRequestAI]]);
+        this.sysHanlders = new Map([
+            [Protocol.sys.requestAI, this.handleRequestAI],
+            [Protocol.sys.loadSgf, this.handleLoadsgf],
+        ]);
     }
 
     private handleMessage = (data: WebSocket.Data) => {
@@ -45,10 +48,10 @@ export default class LeelaGoServer extends EventEmitter {
 
             switch (msg.type) {
                 case 'gtp':
-                    this.handleGtpMessages(msg.data);
+                    this.handleGtpMessages(msg.data as any);
                     break;
                 case 'sys':
-                    this.handleSysMessages(msg.data);
+                    this.handleSysMessages(msg.data as any);
                     break;
             }
 
@@ -132,6 +135,21 @@ export default class LeelaGoServer extends EventEmitter {
 
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [success, 0] });
     }
+
+    private handleLoadsgf = (cmd: Command) => {
+        let moves = cmd.args as [string, string][];
+        if (!moves || moves.length === 0) {
+            this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'bad moves' });
+            return;
+        }
+        
+        moves.forEach(async v => {
+            let gtpcmd = CommandBuilder.play(v[0] as StoneColor, v[1]);
+            await this.engine.sendCommand(gtpcmd);
+        });
+
+        this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'ok' });
+    };
 
     private async handleGtpMessages(cmdstr: string) {
         if (!this.engine || !this.engineLogger) return;
@@ -223,7 +241,7 @@ export default class LeelaGoServer extends EventEmitter {
             respstr,
             variations
         };
-        
+
         this.sendSysResponse({ name: 'genmove', id: cmd.id!, args: JSON.stringify(result) });
     }
 }

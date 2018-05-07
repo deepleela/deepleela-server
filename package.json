@@ -54,7 +54,6 @@
   "dependencies": {
     "@sabaki/gtp": "^1.1.0",
     "deepleela-common": "github:deepleela/deepleela-common",
-    "sha.js": "^2.4.10",
     "winston": "^2.4.2",
     "ws": "^5.1.1"
   },

@@ -11,6 +11,7 @@ import AIManager, { LeelaConfiguration } from './common/AIManager';
 
 type Configuration = {
     listen: number,
+    host?: string,
     max_players: number,
     leela?: LeelaConfiguration,
     leelazero?: LeelaConfiguration,
@@ -57,7 +58,7 @@ if (cluster.isMaster) {
     AIManager.maxInstances = players;
     AIManager.configs = new Map([['leela', config.leela], ['leelazero', config.leelazero]]);
 
-    const server = new ws.Server({ port: config.listen || 3301, host: 'localhost' });
+    const server = new ws.Server({ port: config.listen || 3301, host: config.host || 'localhost' });
     server.on('connection', (client) => {
         AIManager.onlineUsers++;
         client.once('close', () => AIManager.onlineUsers--);
