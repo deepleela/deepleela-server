@@ -136,18 +136,18 @@ export default class LeelaGoServer extends EventEmitter {
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: [success, 0] });
     }
 
-    private handleLoadMoves = (cmd: Command) => {
+    private handleLoadMoves = async (cmd: Command) => {
         let moves = cmd.args as [string, string][];
         if (!moves || moves.length === 0) {
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'bad moves' });
             return;
         }
-        
-        moves.forEach(async v => {
-            let gtpcmd = CommandBuilder.play(v[0] as StoneColor, v[1]);
-            await this.engine.sendCommand(gtpcmd);
-        });
 
+        for (let move of moves) {
+            let gtpcmd = CommandBuilder.play(move[0] as StoneColor, move[1]);
+            await this.engine.sendCommand(gtpcmd);
+        }
+        
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'ok' });
     };
 
