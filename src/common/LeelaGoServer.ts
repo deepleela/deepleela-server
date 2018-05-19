@@ -1,12 +1,20 @@
 import * as WebSocket from 'ws';
 import { Command, Controller, Response } from '@sabaki/gtp';
 import { EventEmitter } from 'events';
-import { Protocol, ProtocolDef } from 'deepleela-common';
+import { Protocol, ProtocolDef, ReviewRoom, ReviewRoomInfo } from 'deepleela-common';
 import AIManager from './AIManager';
 import ReadableLogger from '../lib/ReadableLogger';
 import LineReadable from '../lib/LineReadable';
 import CommandBuilder, { StoneColor } from './CommandBuilder';
-import { coord2point } from '../lib/CoordHelper';
+import * as redis from 'redis';
+import * as crypto from 'crypto';
+
+const RedisOptions = { host: 'localhost', port: 6379 };
+
+export function setRedis(configs: { host: string, port?: number } = RedisOptions) {
+    RedisOptions.host = configs.host;
+    RedisOptions.port = configs.port || RedisOptions.port;
+}
 
 export default class LeelaGoServer extends EventEmitter {
 
@@ -18,6 +26,8 @@ export default class LeelaGoServer extends EventEmitter {
 
     private stderrReadable: LineReadable;
     private engineLogger: ReadableLogger;
+
+    private redis?: redis.RedisClient;
 
     constructor(client: WebSocket) {
         super();
@@ -32,6 +42,9 @@ export default class LeelaGoServer extends EventEmitter {
         this.sysHanlders = new Map([
             [Protocol.sys.requestAI, this.handleRequestAI],
             [Protocol.sys.loadMoves, this.handleLoadMoves],
+            [Protocol.sys.createReviewRoom, this.handleCreateReviewRoom],
+            [Protocol.sys.enterReviewRoom, this.handleEnterReviewRoom],
+            [Protocol.sys.leaveReviewRoom, this.handleLeaveReviewRoom],
         ]);
     }
 
@@ -147,9 +160,67 @@ export default class LeelaGoServer extends EventEmitter {
             let gtpcmd = CommandBuilder.play(move[0] as StoneColor, move[1]);
             await this.engine.sendCommand(gtpcmd);
         }
-        
+
         this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'ok' });
     };
+
+    private handleCreateReviewRoom = async (cmd: Command) => {
+        let [uuid, sgf, nickname, roomName] = cmd.args as string[];
+
+        if (!uuid || !sgf) {
+            this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'paramaters bad' });
+            return;
+        }
+
+        if (this.redis) this.redis.end();
+        this.redis = redis.createClient(RedisOptions);
+        this.redis.once('ready', () => {
+            let roomId = crypto.randomBytes(4).toString('hex');
+            let room: ReviewRoom = { uuid, sgf, roomId, roomName, nickname };
+            this.redis.HMSET(roomId, room, error => {
+                this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
+            });
+        });
+
+        this.redis.on('error', () => {
+
+        });
+    }
+
+    private handleEnterReviewRoom = async (cmd: Command) => {
+        let [roomId, uuid, nickname] = cmd.args as string[];
+
+        const fetchRoom = async (roomId: string) => {
+            if (!this.redis) return null;
+
+            return new Promise<ReviewRoom>(resolve => {
+                this.redis.HGETALL(roomId, (err, obj) => resolve((obj as any) as ReviewRoom));
+            });
+        };
+
+        const sendResponse = (room: ReviewRoom) => {
+            if (!room) return;
+            let roomInfo: ReviewRoomInfo = { isOwner: uuid === room.uuid, sgf: room.sgf, owner: room.nickname, roomId: roomId };
+            this.sendSysResponse({ id: cmd.id, name: cmd.name, args: room ? JSON.stringify(roomInfo) : null });
+        };
+
+        if (!this.redis) {
+            this.redis = redis.createClient(RedisOptions);
+            this.redis.once('ready', async () => {
+                let room = await fetchRoom(roomId);
+                sendResponse(room);
+            });
+            this.redis.on('error', (err) => { });
+            return;
+        }
+
+        let room = await fetchRoom(roomId);
+        sendResponse(room);
+    }
+
+    private handleLeaveReviewRoom = async (cmd: Command) => {
+
+    }
 
     private async handleGtpMessages(cmdstr: string) {
         if (!this.engine || !this.engineLogger) return;

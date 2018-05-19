@@ -54,10 +54,12 @@
   "dependencies": {
     "@sabaki/gtp": "^1.1.0",
     "deepleela-common": "github:deepleela/deepleela-common",
+    "redis": "^2.8.0",
     "winston": "^2.4.2",
     "ws": "^5.1.1"
   },
   "devDependencies": {
+    "@types/redis": "^2.8.6",
     "@types/winston": "^2.3.9",
     "@types/ws": "^4.0.2",
     "ava": "^1.0.0-beta.3",
