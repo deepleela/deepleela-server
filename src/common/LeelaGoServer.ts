@@ -229,6 +229,11 @@ export default class LeelaGoServer extends EventEmitter {
             this.roomInfo = roomInfo;
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: room ? JSON.stringify(roomInfo) : null });
 
+            this.redis.HGETALL(`${Protocol.sys.reviewRoomStateUpdate}_${roomId}_init`, (err, obj) => {
+                if (!obj) return;
+                this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(obj) });
+            });
+
             if (roomInfo.isOwner) return;
 
             this.redis.subscribe(`${Protocol.sys.reviewRoomStateUpdate}_${roomId}`);
@@ -258,7 +263,10 @@ export default class LeelaGoServer extends EventEmitter {
         if (!state) return;
         if (!this.redis) return;
 
-        this.redis.publish(`${Protocol.sys.reviewRoomStateUpdate}_${state.roomId}`, JSON.stringify(state));
+        let key = `${Protocol.sys.reviewRoomStateUpdate}_${state.roomId}`;
+
+        this.redis.publish(key, JSON.stringify(state));
+        this.redis.hmset(`${key}_init`, { roomId: state.roomId, cursor: state.cursor }, (err, u) => { console.log(err, u) });
     }
 
     private handleLeaveReviewRoom = async (cmd: Command) => {
