@@ -1,7 +1,7 @@
 import * as WebSocket from 'ws';
 import { Command, Controller, Response } from '@sabaki/gtp';
 import { EventEmitter } from 'events';
-import { Protocol, ProtocolDef, ReviewRoom, ReviewRoomInfo } from 'deepleela-common';
+import { Protocol, ProtocolDef, ReviewRoom, ReviewRoomInfo, ReviewRoomState } from 'deepleela-common';
 import AIManager from './AIManager';
 import ReadableLogger from '../lib/ReadableLogger';
 import LineReadable from '../lib/LineReadable';
@@ -28,6 +28,7 @@ export default class LeelaGoServer extends EventEmitter {
     private engineLogger: ReadableLogger;
 
     private redis?: redis.RedisClient;
+    private roomInfo?: ReviewRoomInfo;
 
     constructor(client: WebSocket) {
         super();
@@ -44,6 +45,7 @@ export default class LeelaGoServer extends EventEmitter {
             [Protocol.sys.loadMoves, this.handleLoadMoves],
             [Protocol.sys.createReviewRoom, this.handleCreateReviewRoom],
             [Protocol.sys.enterReviewRoom, this.handleEnterReviewRoom],
+            [Protocol.sys.reviewRoomStateUpdate, this.handleReviewRoomUpdate],
             [Protocol.sys.leaveReviewRoom, this.handleLeaveReviewRoom],
         ]);
     }
@@ -65,6 +67,8 @@ export default class LeelaGoServer extends EventEmitter {
                     break;
                 case 'sys':
                     this.handleSysMessages(msg.data as any);
+                    break;
+                case 'sync':
                     break;
             }
 
@@ -92,6 +96,12 @@ export default class LeelaGoServer extends EventEmitter {
         this.client.terminate();
         this.client.removeAllListeners();
 
+        if (this.redis) {
+            this.redis.end(false);
+            this.redis.removeAllListeners();
+            this.redis = undefined;
+        }
+
         if (!this.engine) return;
         AIManager.releaseController(this.engine);
         this.engine = null;
@@ -106,6 +116,12 @@ export default class LeelaGoServer extends EventEmitter {
     sendGtpResponse(resp: Response) {
         if (this.client.readyState !== this.client.OPEN) return;
         let msg: ProtocolDef = { type: 'gtp', data: Response.toString(resp) };
+        this.client.send(JSON.stringify(msg));
+    }
+
+    sendSyncResponse(resp: Command) {
+        if (this.client.readyState != this.client.OPEN) return;
+        let msg: ProtocolDef = { type: 'sync', data: resp };
         this.client.send(JSON.stringify(msg));
     }
 
@@ -172,19 +188,21 @@ export default class LeelaGoServer extends EventEmitter {
             return;
         }
 
-        if (this.redis) this.redis.end();
+        if (this.redis) {
+            this.redis.removeAllListeners();
+            this.redis.end(false);
+        }
+
         this.redis = redis.createClient(RedisOptions);
         this.redis.once('ready', () => {
-            let roomId = crypto.randomBytes(4).toString('hex');
-            let room: ReviewRoom = { uuid, sgf, roomId, roomName, nickname };
+            let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
+            let room: ReviewRoom = { uuid, sgf, roomId, roomName, owner: nickname };
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
             });
         });
 
-        this.redis.on('error', () => {
-
-        });
+        this.redis.on('error', (err) => console.info(err.message));
     }
 
     private handleEnterReviewRoom = async (cmd: Command) => {
@@ -199,9 +217,24 @@ export default class LeelaGoServer extends EventEmitter {
         };
 
         const sendResponse = (room: ReviewRoom) => {
-            if (!room) return;
-            let roomInfo: ReviewRoomInfo = { isOwner: uuid === room.uuid, sgf: room.sgf, owner: room.nickname, roomId: roomId };
+            if (!room) {
+                this.sendSysResponse({ id: cmd.id, name: cmd.name, args: null });
+                this.redis.end(false);
+                this.redis.removeAllListeners();
+                this.redis = undefined;
+                return;
+            }
+
+            let roomInfo: ReviewRoomInfo = { isOwner: uuid === room.uuid, sgf: room.sgf, owner: room.owner, roomId: roomId };
+            this.roomInfo = roomInfo;
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: room ? JSON.stringify(roomInfo) : null });
+
+            if (roomInfo.isOwner) return;
+
+            this.redis.subscribe(`${Protocol.sys.reviewRoomStateUpdate}_${roomId}`);
+            this.redis.on('message', (channel, msg) => {
+                this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
+            });
         };
 
         if (!this.redis) {
@@ -210,12 +243,22 @@ export default class LeelaGoServer extends EventEmitter {
                 let room = await fetchRoom(roomId);
                 sendResponse(room);
             });
-            this.redis.on('error', (err) => { });
+            this.redis.on('error', (err) => console.info(err.message));
             return;
         }
 
         let room = await fetchRoom(roomId);
         sendResponse(room);
+    }
+
+    private handleReviewRoomUpdate = async (cmd: Command) => {
+        if (!this.roomInfo || !this.roomInfo.isOwner) return;
+
+        let state: ReviewRoomState = cmd.args as ReviewRoomState;
+        if (!state) return;
+        if (!this.redis) return;
+
+        this.redis.publish(`${Protocol.sys.reviewRoomStateUpdate}_${state.roomId}`, JSON.stringify(state));
     }
 
     private handleLeaveReviewRoom = async (cmd: Command) => {
@@ -306,7 +349,6 @@ export default class LeelaGoServer extends EventEmitter {
                     .reduce((acc, x) => Object.assign(acc, { [x[0]]: x.slice(x.indexOf(':') + 2) }), {}),
                 variation: line.slice(line.indexOf('PV: ') + 4).trim().split(/\s+/)
             }));
-
 
         let result = {
             respstr,
