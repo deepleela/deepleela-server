@@ -266,7 +266,7 @@ export default class LeelaGoServer extends EventEmitter {
         let key = `${Protocol.sys.reviewRoomStateUpdate}_${state.roomId}`;
 
         this.redis.publish(key, JSON.stringify(state));
-        this.redis.hmset(`${key}_init`, { roomId: state.roomId, cursor: state.cursor }, (err, u) => { console.log(err, u) });
+        this.redis.hmset(`${key}_init`, { roomId: state.roomId, cursor: state.cursor }, (err, u) => { });
     }
 
     private handleLeaveReviewRoom = async (cmd: Command) => {
