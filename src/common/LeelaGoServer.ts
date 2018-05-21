@@ -181,7 +181,7 @@ export default class LeelaGoServer extends EventEmitter {
     };
 
     private handleCreateReviewRoom = async (cmd: Command) => {
-        let [uuid, sgf, nickname, roomName] = cmd.args as string[];
+        let [uuid, sgf, nickname, roomName, chatBroId] = cmd.args as string[];
 
         if (!uuid || !sgf) {
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'paramaters bad' });
@@ -196,7 +196,7 @@ export default class LeelaGoServer extends EventEmitter {
         this.redis = redis.createClient(RedisOptions);
         this.redis.once('ready', () => {
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
-            let room: ReviewRoom = { uuid, sgf, roomId, roomName, owner: nickname };
+            let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
             });
@@ -225,7 +225,7 @@ export default class LeelaGoServer extends EventEmitter {
                 return;
             }
 
-            let roomInfo: ReviewRoomInfo = { isOwner: uuid === room.uuid, sgf: room.sgf, owner: room.owner, roomId: roomId };
+            let roomInfo: ReviewRoomInfo = { isOwner: uuid === room.uuid, sgf: room.sgf, owner: room.owner, roomId: roomId, chatBroId: room.chatBroId };
             this.roomInfo = roomInfo;
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: room ? JSON.stringify(roomInfo) : null });
 
