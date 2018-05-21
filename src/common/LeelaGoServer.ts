@@ -46,6 +46,7 @@ export default class LeelaGoServer extends EventEmitter {
             [Protocol.sys.createReviewRoom, this.handleCreateReviewRoom],
             [Protocol.sys.enterReviewRoom, this.handleEnterReviewRoom],
             [Protocol.sys.reviewRoomStateUpdate, this.handleReviewRoomUpdate],
+            [Protocol.sys.reviewRoomMessage, this.handleReviewRoomMessage],
             [Protocol.sys.leaveReviewRoom, this.handleLeaveReviewRoom],
         ]);
     }
@@ -236,9 +237,20 @@ export default class LeelaGoServer extends EventEmitter {
 
             if (roomInfo.isOwner) return;
 
-            this.redis.subscribe(`${Protocol.sys.reviewRoomStateUpdate}_${roomId}`);
+            let stateUpdate = `${Protocol.sys.reviewRoomStateUpdate}_${roomId}`;
+            let roomMessage = `${roomId}_message`;
+
+            this.redis.subscribe(stateUpdate);
+            this.redis.subscribe(roomMessage);
             this.redis.on('message', (channel, msg) => {
-                this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
+                switch (channel) {
+                    case stateUpdate:
+                        this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
+                        break;
+                    case roomMessage:
+                        this.sendSyncResponse({ name: Protocol.sys.reviewRoomMessage, args: msg });
+                        break;
+                }
             });
         };
 
@@ -267,6 +279,12 @@ export default class LeelaGoServer extends EventEmitter {
 
         this.redis.publish(key, JSON.stringify(state));
         this.redis.hmset(`${key}_init`, { roomId: state.roomId, cursor: state.cursor }, (err, u) => { });
+    }
+
+    private handleReviewRoomMessage = async (cmd: Command) => {
+        if (!this.roomInfo) return;
+        if (!this.redis || !this.roomInfo) return;
+        this.redis.publish(`${this.roomInfo.roomId}_message`, cmd.args);
     }
 
     private handleLeaveReviewRoom = async (cmd: Command) => {
