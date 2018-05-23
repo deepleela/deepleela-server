@@ -6,6 +6,7 @@ export default class CGOSServer {
 
     client: WebSocket;
     telnet: Connection;
+    ready = false;
 
     constructor(client: WebSocket) {
         this.client = client;
@@ -33,6 +34,7 @@ export default class CGOSServer {
     close() {
         this.client.terminate();
         this.client.removeAllListeners();
+        this.telnet.sendln('quit');
         this.telnet.disconnect();
     }
 
@@ -43,6 +45,14 @@ export default class CGOSServer {
         }
 
         if (this.client.readyState !== this.client.OPEN) return;
-        data.split('\n').forEach(line => this.client.send(line));
+
+        if (!this.ready) {
+            this.ready = true;
+            this.client.send('cgos-ready-deepleela');
+        }
+
+        console.log(data);
+        let msgs = data.split('\r\n').filter(v => v.length > 0);
+        msgs.forEach(line => this.client.send(line));
     }
 }
