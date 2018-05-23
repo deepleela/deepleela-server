@@ -7,6 +7,7 @@ export default class CGOSServer {
     client: WebSocket;
     telnet: Connection;
     ready = false;
+    private buffer = '';
 
     constructor(client: WebSocket) {
         this.client = client;
@@ -15,6 +16,7 @@ export default class CGOSServer {
         this.client.on('close', this.handleClose);
         this.telnet = Telnet.client('yss-aya.com:6819');
         this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.telnet.connect());
+        this.telnet.filter(e => e instanceof Error).subscribe(err => this.telnet.connect());
         this.telnet.data.subscribe(this.handleTelnetData, err => console.info(err.message));
         this.telnet.connect();
     }
@@ -51,7 +53,15 @@ export default class CGOSServer {
             this.client.send('cgos-ready-deepleela');
         }
 
-        let msgs = data.split('\r\n').filter(v => v.length > 0);
+        this.buffer += data;
+
+        if (!this.buffer.endsWith('\r\n')) return;
+
+        console.log(this.buffer);
+
+        let msgs = this.buffer.split('\r\n').filter(v => v.length > 0);
         msgs.forEach(line => this.client.send(line));
+
+        this.buffer = '';
     }
 }
