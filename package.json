@@ -54,11 +54,14 @@
   "dependencies": {
     "@sabaki/gtp": "^1.1.0",
     "deepleela-common": "github:deepleela/deepleela-common",
+    "express": "^4.16.3",
     "redis": "^2.8.0",
+    "telnet-rxjs": "^2.1.0",
     "winston": "^2.4.2",
     "ws": "^5.1.1"
   },
   "devDependencies": {
+    "@types/express": "^4.11.1",
     "@types/redis": "^2.8.6",
     "@types/winston": "^2.3.9",
     "@types/ws": "^4.0.2",

@@ -2,6 +2,10 @@
     "listen": 3301,
     "host": "localhost",
     "max_players": 30,
+    "cgos": {
+        "port": 3302,
+        "host": "localhost"
+    },
     "redis": {
         "host": "localhost",
         "port": 6379

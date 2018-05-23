@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as winston from 'winston';
 import LeelaGoServer, * as LeelaServer from './common/LeelaGoServer';
 import AIManager, { LeelaConfiguration } from './common/AIManager';
+import CGOSServer from './common/CGOSServer';
 
 type Configuration = {
     listen: number,
@@ -18,7 +19,11 @@ type Configuration = {
     redis: {
         host: string;
         port?: number;
-    }
+    },
+    cgos: {
+        host: string;
+        port?: number;
+    },
 };
 
 const cpus = os.cpus().length;
@@ -46,11 +51,16 @@ if (cluster.isMaster) {
 
     LeelaServer.setRedis(config.redis);
 
-    const server = new ws.Server({ port: config.listen || 3301, host: config.host || 'localhost' });
-    server.on('connection', client => {
+    const deepleelaWs = new ws.Server({ port: config.listen || 3301, host: config.host || 'localhost' });
+    deepleelaWs.on('connection', client => {
         AIManager.onlineUsers++;
         client.once('close', () => AIManager.onlineUsers--);
         new LeelaGoServer(client as any);
+    });
+
+    const cgosWs = new ws.Server({ port: config.cgos.port || 3302, host: config.cgos.host || 'localhost' });
+    cgosWs.on('connection', client => {
+        new CGOSServer(client as any);
     });
 }
 
