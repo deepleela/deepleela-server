@@ -51,7 +51,6 @@ export default class CGOSServer {
             this.client.send('cgos-ready-deepleela');
         }
 
-        console.log(data);
         let msgs = data.split('\r\n').filter(v => v.length > 0);
         msgs.forEach(line => this.client.send(line));
     }
