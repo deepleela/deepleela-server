@@ -14,11 +14,7 @@ export default class CGOSServer {
         this.client.on('message', this.handleMessage);
         this.client.on('error', this.handleError);
         this.client.on('close', this.handleClose);
-        this.telnet = Telnet.client('yss-aya.com:6819');
-        this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.telnet.connect());
-        this.telnet.filter(e => e instanceof Error).subscribe(err => this.telnet.connect());
-        this.telnet.data.subscribe(this.handleTelnetData, err => console.info(err.message));
-        this.telnet.connect();
+        this.reconnectCGOS();
     }
 
     handleMessage = (data: WebSocket.Data) => {
@@ -31,6 +27,32 @@ export default class CGOSServer {
 
     handleError = () => {
         this.close();
+    }
+
+    handleTelnetError = () => {
+        this.reconnectCGOS();
+    }
+
+    handleTelnetClose = () => {
+        this.reconnectCGOS();
+    }
+
+    reconnectCGOS = () => {
+        if (this.telnet) {
+            this.telnet.socket.removeListener('error', this.handleTelnetError);
+            this.telnet.socket.removeListener('close', this.handleTelnetClose);
+            this.telnet.unsubscribe();
+        }
+
+        // this.telnet.socket.removeAllListeners();
+
+        this.telnet = Telnet.client('yss-aya.com:6819');
+        this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.telnet.connect());
+        this.telnet.filter(e => e instanceof Error).subscribe(err => this.telnet.connect());
+        this.telnet.data.subscribe(this.handleTelnetData, err => console.info(err.message));
+        this.telnet.connect();
+        this.telnet.socket.on('error', this.handleTelnetError);
+        this.telnet.socket.on('close', this.handleTelnetClose);
     }
 
     close() {
