@@ -232,7 +232,14 @@ export default class LeelaGoServer extends EventEmitter {
 
             this.redis.HGETALL(`${Protocol.sys.reviewRoomStateUpdate}_${roomId}_init`, (err, obj) => {
                 if (!obj) return;
-                this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(obj) });
+
+                let state = obj as any;
+                state.cursor = Number.parseInt(obj.cursor);
+                state.branchCursor = obj.branchCursor !== undefined ? Number.parseInt(obj.branchCursor) : undefined;
+                state.history = obj.history !== undefined ? JSON.parse(obj.history) : [];
+                state.historyCursor = obj.historyCursor !== undefined ? Number.parseInt(obj.historyCursor) : -1;
+                state.historySnapshots = obj.historySnapshots !== undefined ? JSON.parse(obj.historySnapshots) : [];
+                this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(state) });
             });
 
             if (roomInfo.isOwner) return;
@@ -278,7 +285,15 @@ export default class LeelaGoServer extends EventEmitter {
         let key = `${Protocol.sys.reviewRoomStateUpdate}_${state.roomId}`;
 
         this.redis.publish(key, JSON.stringify(state));
-        this.redis.hmset(`${key}_init`, { roomId: state.roomId, cursor: state.cursor }, (err, u) => { });
+
+        this.redis.hmset(`${key}_init`, {
+            roomId: state.roomId,
+            cursor: state.cursor,
+            branchCursor: state.branchCursor,
+            history: JSON.stringify(state.history),
+            historyCursor: state.historyCursor,
+            historySnapshots: JSON.stringify(state.historySnapshots),
+        }, (err, u) => { });
     }
 
     private handleReviewRoomMessage = async (cmd: Command) => {

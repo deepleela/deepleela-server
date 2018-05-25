@@ -57,7 +57,7 @@ export default class CGOSServer {
 
         if (!this.buffer.endsWith('\r\n')) return;
 
-        console.log(this.buffer);
+        // console.log(this.buffer);
 
         let msgs = this.buffer.split('\r\n').filter(v => v.length > 0);
         msgs.forEach(line => this.client.send(line));
