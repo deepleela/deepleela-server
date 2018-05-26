@@ -86,7 +86,7 @@ export default class ReviewServer extends EventEmitter {
             this.redis.get(key, (err, value) => {
                 if ((Number.parseInt(value)) > 0) this.redis.decr(key);
             });
-            
+
             setTimeout(() => {
                 try {
                     if (this.redisMessenger) {
