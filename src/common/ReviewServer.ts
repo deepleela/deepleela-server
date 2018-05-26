@@ -8,7 +8,7 @@ import * as WebSocket from 'ws';
 const RedisOptions = { host: 'localhost', port: 6379 };
 
 export default class ReviewServer extends EventEmitter {
-    
+
     static setRedis(configs: { host: string, port?: number } = RedisOptions) {
         RedisOptions.host = configs.host;
         RedisOptions.port = configs.port || RedisOptions.port;
@@ -84,15 +84,15 @@ export default class ReviewServer extends EventEmitter {
             this.redis.publish(`${this.roomInfo.roomId}_leave`, '');
             this.redis.decr(`${this.roomInfo.roomId}_people`);
             setTimeout(() => {
-                this.redis.end(true);
-                this.redis.removeAllListeners();
-                this.redis = undefined;
-
                 if (this.redisMessenger) {
                     this.redisMessenger.unsubscribe();
                     this.redisMessenger.end(false);
                     this.redisMessenger = undefined;
                 }
+
+                this.redis.end(true);
+                this.redis.removeAllListeners();
+                this.redis = undefined;
             }, 3000);
         }
     }
@@ -135,7 +135,7 @@ export default class ReviewServer extends EventEmitter {
 
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
-            this.redis.set(`${roomId}_people`, 1 as any);
+            this.redis.set(`${roomId}_people`, 0 as any);
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
             });
@@ -180,17 +180,15 @@ export default class ReviewServer extends EventEmitter {
                 this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(state) });
             });
 
-            this.redis.incr(`${roomId}_people`);
-
+            
             let stateUpdate = `${Protocol.sys.reviewRoomStateUpdate}_${roomId}`;
             let roomMessage = `${roomId}_message`;
             let joinRoomNotification = `${roomId}_join`;
             let leaveRoomNotification = `${roomId}_leave`;
-
+            
+            this.redis.incr(`${roomId}_people`);
             this.redisMessenger.publish(joinRoomNotification, JSON.stringify({ nickname }));
-
-            this.redisMessenger.subscribe(stateUpdate);
-            [roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
+            [stateUpdate, roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
 
             this.redisMessenger.on('message', (channel, msg) => {
                 switch (channel) {
