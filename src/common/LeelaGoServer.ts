@@ -28,6 +28,7 @@ export default class LeelaGoServer extends EventEmitter {
     private engineLogger: ReadableLogger;
 
     private redis?: redis.RedisClient;
+    private redisMessenger?: redis.RedisClient;
     private roomInfo?: ReviewRoomInfo;
 
     constructor(client: WebSocket) {
@@ -98,9 +99,19 @@ export default class LeelaGoServer extends EventEmitter {
         this.client.removeAllListeners();
 
         if (this.redis) {
-            this.redis.end(false);
-            this.redis.removeAllListeners();
-            this.redis = undefined;
+            this.redis.publish(`${this.roomInfo.roomId}_leave`, '');
+            this.redis.decr(`${this.roomInfo.roomId}_people`);
+            setTimeout(() => {
+                this.redis.end(true);
+                this.redis.removeAllListeners();
+                this.redis = undefined;
+
+                if (this.redisMessenger) {
+                    this.redisMessenger.unsubscribe();
+                    this.redisMessenger.end(false);
+                    this.redisMessenger = undefined;
+                }
+            }, 3000);
         }
 
         if (!this.engine) return;
@@ -190,12 +201,21 @@ export default class LeelaGoServer extends EventEmitter {
         }
 
         if (this.redis) {
-            this.redis.removeAllListeners();
             this.redis.end(false);
+            this.redis.removeAllListeners();
+        }
+
+        if (this.redisMessenger) {
+            this.redisMessenger.end(false);
+            this.redisMessenger.unsubscribe();
+            this.redisMessenger.removeAllListeners();
+            this.redisMessenger = undefined;
         }
 
         this.redis = redis.createClient(RedisOptions);
         this.redis.once('ready', () => {
+            this.redisMessenger = this.redis.duplicate();
+
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
             this.redis.HMSET(roomId, room, error => {
@@ -242,20 +262,35 @@ export default class LeelaGoServer extends EventEmitter {
                 this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(state) });
             });
 
-            if (roomInfo.isOwner) return;
+            this.redis.incr(`${roomId}_people`);
 
             let stateUpdate = `${Protocol.sys.reviewRoomStateUpdate}_${roomId}`;
             let roomMessage = `${roomId}_message`;
+            let joinRoomNotification = `${roomId}_join`;
+            let leaveRoomNotification = `${roomId}_leave`;
 
-            this.redis.subscribe(stateUpdate);
-            this.redis.subscribe(roomMessage);
-            this.redis.on('message', (channel, msg) => {
+            this.redisMessenger.publish(joinRoomNotification, JSON.stringify({ nickname }));
+
+            this.redisMessenger.subscribe(stateUpdate);
+            [roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
+
+            this.redisMessenger.on('message', (channel, msg) => {
                 switch (channel) {
                     case stateUpdate:
                         this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
                         break;
                     case roomMessage:
                         this.sendSyncResponse({ name: Protocol.sys.reviewRoomMessage, args: msg });
+                        break;
+                    case joinRoomNotification:
+                        this.redis.get(`${roomId}_people`, (err, value) => {
+                            let count = Number.parseInt(value) || 0;
+                            console.log(count);
+                            this.sendSyncResponse({ name: Protocol.sys.joinReviewRoom, args: { count, nickname } });
+                        });
+                        break;
+                    case leaveRoomNotification:
+                        this.sendSyncResponse({ name: Protocol.sys.leaveReviewRoom, args: msg });
                         break;
                 }
             });
@@ -264,6 +299,7 @@ export default class LeelaGoServer extends EventEmitter {
         if (!this.redis) {
             this.redis = redis.createClient(RedisOptions);
             this.redis.once('ready', async () => {
+                this.redisMessenger = this.redis.duplicate();
                 let room = await fetchRoom(roomId);
                 sendResponse(room);
             });
@@ -297,13 +333,14 @@ export default class LeelaGoServer extends EventEmitter {
     }
 
     private handleReviewRoomMessage = async (cmd: Command) => {
-        if (!this.roomInfo) return;
         if (!this.redis || !this.roomInfo) return;
         this.redis.publish(`${this.roomInfo.roomId}_message`, cmd.args);
     }
 
     private handleLeaveReviewRoom = async (cmd: Command) => {
-
+        if (!this.roomInfo || !this.redis) return;
+        this.redis.publish(`${this.roomInfo.roomId}_leave`, '');
+        this.redis.decr(`${this.roomInfo.roomId}_people`);
     }
 
     private async handleGtpMessages(cmdstr: string) {
