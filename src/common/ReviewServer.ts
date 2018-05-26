@@ -82,17 +82,25 @@ export default class ReviewServer extends EventEmitter {
 
         if (this.redis) {
             this.redis.publish(`${this.roomInfo.roomId}_leave`, '');
-            this.redis.decr(`${this.roomInfo.roomId}_people`);
+            let key = `${this.roomInfo.roomId}_people`;
+            this.redis.get(key, (err, value) => {
+                if ((Number.parseInt(value)) > 0) this.redis.decr(key);
+            });
+            
             setTimeout(() => {
-                if (this.redisMessenger) {
-                    this.redisMessenger.unsubscribe();
-                    this.redisMessenger.end(false);
-                    this.redisMessenger = undefined;
-                }
+                try {
+                    if (this.redisMessenger) {
+                        this.redisMessenger.unsubscribe();
+                        this.redisMessenger.end(false);
+                        this.redisMessenger = undefined;
+                    }
+                } catch{ }
 
-                this.redis.end(true);
-                this.redis.removeAllListeners();
-                this.redis = undefined;
+                try {
+                    this.redis.end(true);
+                    this.redis.removeAllListeners();
+                    this.redis = undefined;
+                } catch { }
             }, 3000);
         }
     }
@@ -117,21 +125,26 @@ export default class ReviewServer extends EventEmitter {
             return;
         }
 
-        if (this.redis) {
-            this.redis.end(false);
-            this.redis.removeAllListeners();
-        }
+        try {
+            if (this.redisMessenger) {
+                this.redisMessenger.unsubscribe();
+                this.redisMessenger.end(false);
+                this.redisMessenger.removeAllListeners();
+                this.redisMessenger = undefined;
+            }
+        } catch { }
 
-        if (this.redisMessenger) {
-            this.redisMessenger.end(false);
-            this.redisMessenger.unsubscribe();
-            this.redisMessenger.removeAllListeners();
-            this.redisMessenger = undefined;
-        }
+        try {
+            if (this.redis) {
+                this.redis.end(false);
+                this.redis.removeAllListeners();
+            }
+        } catch { }
 
         this.redis = redis.createClient(RedisOptions);
         this.redis.once('ready', () => {
             this.redisMessenger = this.redis.duplicate();
+            this.redisMessenger.on('error', (err) => console.info(err.message));
 
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
@@ -180,36 +193,11 @@ export default class ReviewServer extends EventEmitter {
                 this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: JSON.stringify(state) });
             });
 
-            
-            let stateUpdate = `${Protocol.sys.reviewRoomStateUpdate}_${roomId}`;
-            let roomMessage = `${roomId}_message`;
-            let joinRoomNotification = `${roomId}_join`;
-            let leaveRoomNotification = `${roomId}_leave`;
-            
-            this.redis.incr(`${roomId}_people`);
-            this.redisMessenger.publish(joinRoomNotification, JSON.stringify({ nickname }));
-            [stateUpdate, roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
-
-            this.redisMessenger.on('message', (channel, msg) => {
-                switch (channel) {
-                    case stateUpdate:
-                        this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
-                        break;
-                    case roomMessage:
-                        this.sendSyncResponse({ name: Protocol.sys.reviewRoomMessage, args: msg });
-                        break;
-                    case joinRoomNotification:
-                        this.redis.get(`${roomId}_people`, (err, value) => {
-                            let count = Number.parseInt(value) || 0;
-                            console.log(count);
-                            this.sendSyncResponse({ name: Protocol.sys.joinReviewRoom, args: { count, nickname } });
-                        });
-                        break;
-                    case leaveRoomNotification:
-                        this.sendSyncResponse({ name: Protocol.sys.leaveReviewRoom, args: msg });
-                        break;
-                }
+            this.redis.incr(`${roomId}_people`, (err, value) => {
+                this.sendSyncResponse({ name: Protocol.sys.joinReviewRoom, args: { count: value || 0, nickname } })
             });
+
+            this.subscribeRoom(roomInfo);
         };
 
         if (!this.redis) {
@@ -225,6 +213,41 @@ export default class ReviewServer extends EventEmitter {
 
         let room = await fetchRoom(roomId);
         sendResponse(room);
+    }
+
+    private subscribeRoom(roomInfo: ReviewRoomInfo) {
+        let { roomId, } = roomInfo;
+
+        let stateUpdate = `${Protocol.sys.reviewRoomStateUpdate}_${roomId}`;
+        let roomMessage = `${roomId}_message`;
+        let joinRoomNotification = `${roomId}_join`;
+        let leaveRoomNotification = `${roomId}_leave`;
+
+
+        this.redisMessenger.publish(joinRoomNotification, JSON.stringify({ nickname: '' }));
+        [stateUpdate, roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
+
+        this.redisMessenger.on('message', (channel, msg) => {
+            switch (channel) {
+                case stateUpdate:
+                    this.sendSyncResponse({ name: Protocol.sys.reviewRoomStateUpdate, args: msg });
+                    break;
+                case roomMessage:
+                    this.sendSyncResponse({ name: Protocol.sys.reviewRoomMessage, args: msg });
+                    break;
+                case joinRoomNotification:
+                    this.redis.get(`${roomId}_people`, (err, value) => {
+                        let count = Number.parseInt(value) || 0;
+                        this.sendSyncResponse({ name: Protocol.sys.joinReviewRoom, args: { count, nickname: '' } });
+                    });
+                    break;
+                case leaveRoomNotification:
+                    this.redis.get(`${roomId}_people`, (err, value) => {
+                        this.sendSyncResponse({ name: Protocol.sys.leaveReviewRoom, args: { count: Number.parseInt(value) || 0, } });
+                    });
+                    break;
+            }
+        });
     }
 
     private handleReviewRoomUpdate = async (cmd: Command) => {
