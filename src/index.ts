@@ -9,6 +9,7 @@ import * as winston from 'winston';
 import LeelaGoServer, * as LeelaServer from './common/LeelaGoServer';
 import AIManager, { LeelaConfiguration } from './common/AIManager';
 import CGOSServer from './common/CGOSServer';
+import ReviewServer from './common/ReviewServer';
 
 type Configuration = {
     listen: number,
@@ -24,6 +25,10 @@ type Configuration = {
         host: string;
         port?: number;
     },
+    review: {
+        host: string;
+        port?: number;
+    }
 };
 
 const cpus = os.cpus().length;
@@ -49,7 +54,7 @@ if (cluster.isMaster) {
     AIManager.maxInstances = players;
     AIManager.configs = new Map([['leela', config.leela], ['leelazero', config.leelazero]]);
 
-    LeelaServer.setRedis(config.redis);
+    ReviewServer.setRedis(config.redis);
 
     const deepleelaWs = new ws.Server({ port: config.listen || 3301, host: config.host || 'localhost' });
     deepleelaWs.on('connection', client => {
@@ -61,6 +66,11 @@ if (cluster.isMaster) {
     const cgosWs = new ws.Server({ port: config.cgos.port || 3302, host: config.cgos.host || 'localhost' });
     cgosWs.on('connection', client => {
         new CGOSServer(client as any);
+    });
+
+    const reviewWs = new ws.Server({ port: config.review.port || 3303, host: config.review.host || 'localhost' });
+    reviewWs.on('connection', client => {
+        new ReviewServer(client as any);
     });
 }
 

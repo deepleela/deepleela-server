@@ -7,22 +7,30 @@ import * as WebSocket from 'ws';
 
 const RedisOptions = { host: 'localhost', port: 6379 };
 
-export function setRedis(configs: { host: string, port?: number } = RedisOptions) {
-    RedisOptions.host = configs.host;
-    RedisOptions.port = configs.port || RedisOptions.port;
-}
-
 export default class ReviewServer extends EventEmitter {
+    
+    static setRedis(configs: { host: string, port?: number } = RedisOptions) {
+        RedisOptions.host = configs.host;
+        RedisOptions.port = configs.port || RedisOptions.port;
+    }
 
     private redis?: redis.RedisClient;
     private redisMessenger?: redis.RedisClient;
     private roomInfo?: ReviewRoomInfo;
     private client: WebSocket;
     private sysHanlders: Map<string, Function>;
+    private keepaliveTimer: NodeJS.Timer;
 
     constructor(client: WebSocket) {
         super();
         this.client = client;
+
+        this.client.on('message', this.handleMessage);
+        this.client.on('close', this.handleClose);
+        this.client.on('error', this.handleError);
+
+        this.keepaliveTimer = setInterval(() => this.client.ping(), 15 * 1000);
+
         this.sysHanlders = new Map([
             [Protocol.sys.createReviewRoom, this.handleCreateReviewRoom],
             [Protocol.sys.enterReviewRoom, this.handleEnterReviewRoom],
@@ -30,6 +38,63 @@ export default class ReviewServer extends EventEmitter {
             [Protocol.sys.reviewRoomMessage, this.handleReviewRoomMessage],
             [Protocol.sys.leaveReviewRoom, this.handleLeaveReviewRoom],
         ]);
+    }
+
+    private handleMessage = (data: WebSocket.Data) => {
+        let msg: ProtocolDef = null;
+
+        try {
+            msg = JSON.parse(data.toString()) as ProtocolDef;
+
+            if (!msg.type) {
+                this.close();
+                return;
+            }
+
+            switch (msg.type) {
+                case 'sys':
+                    let cmd = msg.data as Command;
+                    let handler = this.sysHanlders.get(cmd.name);
+                    if (!handler) return;
+                    handler(cmd);
+                    break;
+            }
+
+        } catch (error) {
+            this.close();
+        }
+    }
+
+    private handleClose = (code: number, reason: string) => {
+        this.close();
+    }
+
+    private handleError = (error: Error) => {
+        this.close();
+    }
+
+    private close() {
+        clearInterval(this.keepaliveTimer);
+        super.emit('close', this);
+
+        this.client.terminate();
+        this.client.removeAllListeners();
+
+        if (this.redis) {
+            this.redis.publish(`${this.roomInfo.roomId}_leave`, '');
+            this.redis.decr(`${this.roomInfo.roomId}_people`);
+            setTimeout(() => {
+                this.redis.end(true);
+                this.redis.removeAllListeners();
+                this.redis = undefined;
+
+                if (this.redisMessenger) {
+                    this.redisMessenger.unsubscribe();
+                    this.redisMessenger.end(false);
+                    this.redisMessenger = undefined;
+                }
+            }, 3000);
+        }
     }
 
     sendSysResponse(cmd: Command) {
@@ -70,6 +135,7 @@ export default class ReviewServer extends EventEmitter {
 
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
+            this.redis.set(`${roomId}_people`, 1 as any);
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
             });
@@ -77,7 +143,7 @@ export default class ReviewServer extends EventEmitter {
 
         this.redis.on('error', (err) => console.info(err.message));
     }
-    
+
     private handleEnterReviewRoom = async (cmd: Command) => {
         let [roomId, uuid, nickname] = cmd.args as string[];
 

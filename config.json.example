@@ -10,6 +10,10 @@
         "host": "localhost",
         "port": 6379
     },
+    "review":{
+        "host": "localhost",
+        "port": 3303
+    },
     "leela": {
         "exec": "/path-to-leela",
         "playouts": 200 // optional
