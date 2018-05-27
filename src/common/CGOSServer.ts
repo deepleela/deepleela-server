@@ -40,12 +40,13 @@ export default class CGOSServer {
 
     reconnectCGOS = () => {
         if (this.telnet) {
-            this.telnet.socket.removeListener('error', this.handleTelnetError);
-            this.telnet.socket.removeListener('close', this.handleTelnetClose);
-            this.telnet.unsubscribe();
+            try {
+                this.telnet.socket.removeListener('error', this.handleTelnetError);
+                this.telnet.socket.removeListener('close', this.handleTelnetClose);
+                this.telnet.socket.removeAllListeners();
+                this.telnet.unsubscribe();
+            } catch { }
         }
-
-        // this.telnet.socket.removeAllListeners();
 
         this.telnet = Telnet.client('yss-aya.com:6819');
         this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.telnet.connect());
@@ -79,8 +80,6 @@ export default class CGOSServer {
         this.buffer += data;
 
         if (!this.buffer.endsWith('\r\n')) return;
-
-        console.log(this.buffer);
 
         let msgs = this.buffer.split('\r\n').filter(v => v.length > 0);
         msgs.forEach(line => this.client.send(line));
