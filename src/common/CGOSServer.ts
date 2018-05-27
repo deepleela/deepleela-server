@@ -64,7 +64,7 @@ export default class CGOSServer {
     }
 
     handleTelnetData = (data: string) => {
-        if (data.includes('protocol')) {
+        if (data.includes('protocol') && this.telnet.socket.writable) {
             this.telnet.sendln('v1 cgosview 0.32 deepleela');
             return;
         }
