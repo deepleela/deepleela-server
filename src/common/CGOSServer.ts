@@ -58,10 +58,13 @@ export default class CGOSServer {
     }
 
     close() {
-        this.client.terminate();
-        this.client.removeAllListeners();
-        this.telnet.sendln('quit');
-        this.telnet.disconnect();
+        try {
+            this.client.terminate();
+            this.client.removeAllListeners();
+            this.telnet.sendln('quit');
+            this.telnet.disconnect();
+        }
+        catch{ }
     }
 
     handleTelnetData = (data: string) => {

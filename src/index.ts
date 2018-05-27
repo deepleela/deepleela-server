@@ -75,3 +75,4 @@ if (cluster.isMaster) {
 }
 
 process.title = `deepleela-server-${cluster.isMaster ? 'master' : 'worker'}`;
+process.on('uncaughtException', err => console.log(err));
