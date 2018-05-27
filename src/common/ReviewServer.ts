@@ -148,7 +148,9 @@ export default class ReviewServer extends EventEmitter {
 
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
-            this.redis.set(`${roomId}_people`, 0 as any);
+            
+            // this.redis.set(`${roomId}_people`, 0 as any);
+            
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
             });
