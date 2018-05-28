@@ -22,10 +22,12 @@ export default class CGOSServer {
     }
 
     handleClose = () => {
+        console.log(this.client.url, 'close');
         this.close();
     }
 
-    handleError = () => {
+    handleError = (err) => {
+        console.log(err.message);
         this.close();
     }
 
@@ -41,7 +43,7 @@ export default class CGOSServer {
     reconnectCGOS = () => {
         if (this.telnet) {
             try {
-                this.telnet.sendln('quit');
+                console.log('reconnecting cgos');
                 this.telnet.socket.removeListener('error', this.handleTelnetError);
                 this.telnet.socket.removeListener('close', this.handleTelnetClose);
                 this.telnet.socket.removeAllListeners();
@@ -58,6 +60,7 @@ export default class CGOSServer {
         this.telnet.connect();
         this.telnet.socket.on('error', this.handleTelnetError);
         this.telnet.socket.on('close', this.handleTelnetClose);
+        console.log('connect to cgos');
     }
 
     close() {
