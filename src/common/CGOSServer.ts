@@ -41,16 +41,19 @@ export default class CGOSServer {
     reconnectCGOS = () => {
         if (this.telnet) {
             try {
+                this.telnet.sendln('quit');
                 this.telnet.socket.removeListener('error', this.handleTelnetError);
                 this.telnet.socket.removeListener('close', this.handleTelnetClose);
                 this.telnet.socket.removeAllListeners();
+                this.telnet.socket.destroy();
                 this.telnet.unsubscribe();
+                console.log('clean cgos connection');
             } catch { }
         }
 
         this.telnet = Telnet.client('yss-aya.com:6819');
-        this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.telnet.connect());
-        this.telnet.filter(e => e instanceof Error).subscribe(err => this.telnet.connect());
+        this.telnet.filter((event) => event instanceof Telnet.Event.Ended).subscribe((event) => this.reconnectCGOS());
+        this.telnet.filter(e => e instanceof Error).subscribe(err => this.reconnectCGOS());
         this.telnet.data.subscribe(this.handleTelnetData, err => console.info(err.message));
         this.telnet.connect();
         this.telnet.socket.on('error', this.handleTelnetError);
@@ -63,13 +66,15 @@ export default class CGOSServer {
             this.client.removeAllListeners();
             this.telnet.sendln('quit');
             this.telnet.disconnect();
+            this.telnet.socket.destroy();
+            console.log('close cgos socket');
         }
         catch{ }
     }
 
     handleTelnetData = (data: string) => {
         if (data.includes('protocol') && this.telnet.socket.writable) {
-            this.telnet.sendln('v1 cgosview 0.32 deepleela');
+            this.telnet.sendln('v1 cgosview 0.33 deepleela');
             return;
         }
 
