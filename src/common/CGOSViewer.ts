@@ -78,7 +78,7 @@ export default class CGOSViewer {
             this.matches.push(m);
             this.clients.forEach(c => c.send(m));
         });
-        
+
         while (this.matches.length > 100) {
             this.matches.shift();
         }
@@ -86,13 +86,15 @@ export default class CGOSViewer {
         contents.filter(v => v.startsWith('gameover')).forEach(go => {
             let [_, id, result] = go.split(' ');
             let match = this.matches.find(m => m.includes(id));
+            let index = this.matches.findIndex(m => m.includes(id));
             if (!match) return;
             let [cmd, gid, date, time, size, komi, white, black, r] = match.split(' ');
             let now = new Date();
             date = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
             time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             match = `${cmd} ${gid} ${date} ${time} ${size} ${komi} ${white} ${black} ${result}`;
-
+            
+            this.matches[index] = match;
             this.clients.forEach(c => { if (c.readyState === c.OPEN) c.send(go) });
         });
 
