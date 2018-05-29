@@ -118,7 +118,7 @@ export default class ReviewServer extends EventEmitter {
     }
 
     private handleCreateReviewRoom = async (cmd: Command) => {
-        let [uuid, sgf, nickname, roomName, chatBroId] = cmd.args as string[];
+        let [uuid, sgf, nickname, roomName] = cmd.args as string[];
 
         if (!uuid || !sgf) {
             this.sendSysResponse({ id: cmd.id, name: cmd.name, args: 'paramaters bad' });
@@ -147,12 +147,13 @@ export default class ReviewServer extends EventEmitter {
             this.redisMessenger.on('error', (err) => console.info(err.message));
 
             let roomId = crypto.createHash('md5').update(uuid).digest().toString('hex').substr(0, 8);
-            let room: ReviewRoom = { uuid, sgf, roomId, roomName, chatBroId, owner: nickname };
-            
+            let room: ReviewRoom = { uuid, sgf, roomId, roomName, owner: nickname };
+
             // this.redis.set(`${roomId}_people`, 0 as any);
-            
+            this.redis.expire(`${roomId}_people`, 3600 * 24);
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
+                this.redis.expire(roomId, 3600 * 24 * 7);
             });
         });
 
@@ -225,7 +226,6 @@ export default class ReviewServer extends EventEmitter {
         let joinRoomNotification = `${roomId}_join`;
         let leaveRoomNotification = `${roomId}_leave`;
 
-
         this.redisMessenger.publish(joinRoomNotification, JSON.stringify({ nickname: '' }));
         [stateUpdate, roomMessage, joinRoomNotification, leaveRoomNotification].forEach(n => this.redisMessenger.subscribe(n));
 
@@ -270,7 +270,7 @@ export default class ReviewServer extends EventEmitter {
             history: JSON.stringify(state.history),
             historyCursor: state.historyCursor,
             historySnapshots: JSON.stringify(state.historySnapshots),
-        }, (err, u) => { });
+        }, (err, u) => { this.redis.expire(`${key}_init`, 3600 * 24 * 7) });
     }
 
     private handleReviewRoomMessage = async (cmd: Command) => {
