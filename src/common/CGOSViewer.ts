@@ -1,7 +1,7 @@
 
 import { Telnet, Connection } from 'telnet-rxjs';
 import * as WebSocket from 'ws';
-
+import * as cluster from 'cluster';
 
 type ObservedGame = { setup: string, updates: string[], count: number };
 
@@ -17,6 +17,10 @@ export default class CGOSViewer {
     observedGames = new Map<string, ObservedGame>();
 
     private constructor() {
+
+    }
+
+    init() {
         this.reconnectCGOS();
     }
 

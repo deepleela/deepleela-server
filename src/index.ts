@@ -65,6 +65,7 @@ if (cluster.isMaster) {
     });
 
     const cgosWs = new ws.Server({ port: config.cgos.port || 3302, host: config.cgos.host || 'localhost' });
+    CGOSViewer.default.init();
     cgosWs.on('connection', client => {
         CGOSViewer.default.addClient(client as any);
     });
