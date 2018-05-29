@@ -162,13 +162,15 @@ export default class CGOSViewer {
         let observedGames = this.observers.get(client);
         this.observers.delete(client);
 
-        observedGames.forEach(id => {
-            let game = this.observedGames.get(id);
-            if (!game) return;
-            game.count--;
-            if (game.count > 0) return;
-            this.observedGames.delete(id);
-        });
+        if (observedGames) {
+            observedGames.forEach(id => {
+                let game = this.observedGames.get(id);
+                if (!game) return;
+                game.count--;
+                if (game.count > 0) return;
+                this.observedGames.delete(id);
+            });
+        }
 
         console.log('cgos stats:', 'clients', this.clients.size, 'observed games', this.observedGames.size, 'observers', this.observers.size);
     }
