@@ -8,8 +8,8 @@ import * as fs from 'fs';
 import * as winston from 'winston';
 import LeelaGoServer, * as LeelaServer from './common/LeelaGoServer';
 import AIManager, { LeelaConfiguration } from './common/AIManager';
-import CGOSServer from './common/CGOSServer';
 import ReviewServer from './common/ReviewServer';
+import CGOSViewer from './common/CGOSViewer';
 
 type Configuration = {
     listen: number,
@@ -43,6 +43,7 @@ if (cluster.isMaster) {
         forkSelf();
     }
 } else {
+
     if (!fs.existsSync('./config.json')) {
         winston.error('The configuration file does not exist, copy config.json.example to config.json, and try agian.');
         process.exit(-1);
@@ -65,13 +66,14 @@ if (cluster.isMaster) {
 
     const cgosWs = new ws.Server({ port: config.cgos.port || 3302, host: config.cgos.host || 'localhost' });
     cgosWs.on('connection', client => {
-        new CGOSServer(client as any);
+        CGOSViewer.default.addClient(client as any);
     });
 
     const reviewWs = new ws.Server({ port: config.review.port || 3303, host: config.review.host || 'localhost' });
     reviewWs.on('connection', client => {
         new ReviewServer(client as any);
     });
+
 }
 
 process.title = `deepleela-server-${cluster.isMaster ? 'master' : 'worker'}`;
