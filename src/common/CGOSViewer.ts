@@ -74,7 +74,11 @@ export default class CGOSViewer {
 
         let contents = this.buffer.split('\r\n');
 
-        contents.filter(v => v.startsWith('match')).forEach(m => this.matches.push(m));
+        contents.filter(v => v.startsWith('match')).forEach(m => {
+            this.matches.push(m);
+            this.clients.forEach(c => c.send(m));
+        });
+        
         while (this.matches.length > 100) {
             this.matches.shift();
         }
