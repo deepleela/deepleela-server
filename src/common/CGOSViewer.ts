@@ -93,7 +93,7 @@ export default class CGOSViewer {
             date = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
             time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             match = `${cmd} ${gid} ${date} ${time} ${size} ${komi} ${white} ${black} ${result}`;
-            
+
             this.matches[index] = match;
             this.clients.forEach(c => { if (c.readyState === c.OPEN) c.send(go) });
         });
@@ -141,7 +141,14 @@ export default class CGOSViewer {
     }
 
     handleMessage = (msg: string, client: WebSocket) => {
-        if (!msg || !msg.startsWith('observe')) return;
+        if (!msg) return;
+
+        if (msg.startsWith('initMatches')) {
+            this.matches.forEach(m => client.send(m));
+            return;
+        }
+
+        if (!msg.startsWith('observe')) return;
         let [cmd, gid] = msg.replace('\r\n', '').split(' ');
         if (!Number.parseInt(gid)) return;
 
