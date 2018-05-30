@@ -7,6 +7,8 @@
 DeepLeela-Server
 ===
 
+DeepLeela Node.js Server
+
 ## Prerequisites
 
 1. Node.js 8.9+
