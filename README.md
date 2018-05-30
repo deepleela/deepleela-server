@@ -85,7 +85,7 @@ server {
 nano /etc/nginx/conf.d/deepleela-review.conf
 
 upstream deepleela_review {
-    server localhost:3302;
+    server localhost:3303;
 }
 
 server {
