@@ -38,7 +38,9 @@ Port 3303: DeepLeela Online Review
 
 The default configruation file is config.json, you should copy `config.json.example` to `config.json` manually.
 
-# Nginx Reverse Proxy Example
+# Nginx Reverse Proxy Examples
+
+To enable the TCP communication between webpage and server,  you should config nginx reverse proxies. Here are examples.
 
 ```
 nano /etc/nginx/conf.d/deepleela-gtp.conf
