@@ -16,7 +16,7 @@ export default class ReviewServer extends EventEmitter {
 
     private redis?: redis.RedisClient;
     private redisMessenger?: redis.RedisClient;
-    private roomInfo?: ReviewRoomInfo;
+    private roomInfo?: ReviewRoomInfo = <ReviewRoomInfo>{};
     private client: WebSocket;
     private sysHanlders: Map<string, Function>;
     private keepaliveTimer: NodeJS.Timer;

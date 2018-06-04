@@ -160,7 +160,7 @@ export default class CGOSViewer {
         } else {
             this.telnet.sendln(`observe ${gid}`);
             game = { setup: '', updates: [], count: 1 };
-            this.observedGames.set(gid, game);
+            if (!this.observedGames.has(gid)) this.observedGames.set(gid, game);
         }
 
         let observedGames: string[] = this.observers.get(client) || [];
