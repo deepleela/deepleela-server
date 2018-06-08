@@ -150,10 +150,10 @@ export default class ReviewServer extends EventEmitter {
             let room: ReviewRoom = { uuid, sgf, roomId, roomName, owner: nickname };
 
             // this.redis.set(`${roomId}_people`, 0 as any);
-            this.redis.expire(`${roomId}_people`, 3600 * 24);
+            this.redis.expire(`${roomId}_people`, 3600 * 24 * 30);
             this.redis.HMSET(roomId, room, error => {
                 this.sendSysResponse({ id: cmd.id, name: cmd.name, args: error ? null : JSON.stringify(room) });
-                this.redis.expire(roomId, 3600 * 24 * 7);
+                this.redis.expire(roomId, 3600 * 24 * 30);
             });
         });
 
@@ -270,7 +270,7 @@ export default class ReviewServer extends EventEmitter {
             history: JSON.stringify(state.history),
             historyCursor: state.historyCursor,
             historySnapshots: JSON.stringify(state.historySnapshots),
-        }, (err, u) => { this.redis.expire(`${key}_init`, 3600 * 24 * 7) });
+        }, (err, u) => { this.redis.expire(`${key}_init`, 3600 * 24 * 30) });
     }
 
     private handleReviewRoomMessage = async (cmd: Command) => {

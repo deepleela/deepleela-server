@@ -185,6 +185,11 @@ export default class CGOSViewer {
             });
         }
 
+        if (this.clients.size === 0) {
+            this.observedGames.clear();
+            this.observers.clear();
+        }
+
         console.log('cgos stats:', 'clients', this.clients.size, 'observed games', this.observedGames.size, 'observers', this.observers.size);
     }
 
