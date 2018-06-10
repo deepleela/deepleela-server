@@ -175,7 +175,8 @@ export default class LeelaGoServer extends EventEmitter {
                     await this.genHeatmap(cmd.id);
                     break;
                 case 'genmove':
-                    await this.genMove(cmd);
+                    let result = await LeelaGoServer.genMove(cmd, this.engine, this.engineLogger);
+                    this.sendSysResponse({ name: 'genmove', id: cmd.id!, args: JSON.stringify(result) });
                     break;
             }
 
@@ -223,13 +224,14 @@ export default class LeelaGoServer extends EventEmitter {
         this.sendSysResponse({ name: 'heatmap', id, args: JSON.stringify(result) });
     }
 
-    private async genMove(cmd: Command) {
-        let res = await this.engine.sendCommand(cmd);
+    static async genMove(cmd: Command, engine: Controller, logger: ReadableLogger) {
+        // let res = await this.engine.sendCommand(cmd);
+        let res = await engine.sendCommand(cmd);
         let respstr = Response.toString(res);
 
-        let log = this.engineLogger.log;
+        // let log = this.engineLogger.log;
 
-        let lines = log.split('\n');
+        let lines = logger.log.split('\n');
 
         let startIndex = lines.findIndex(line => line.includes('MC winrate=') || line.includes('NN eval='));
         if (startIndex < 0) startIndex = lines.length;
@@ -252,6 +254,7 @@ export default class LeelaGoServer extends EventEmitter {
             variations
         };
 
-        this.sendSysResponse({ name: 'genmove', id: cmd.id!, args: JSON.stringify(result) });
+        return result;
+        // this.sendSysResponse({ name: 'genmove', id: cmd.id!, args: JSON.stringify(result) });
     }
 }

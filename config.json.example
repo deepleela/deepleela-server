@@ -14,6 +14,10 @@
         "host": "localhost",
         "port": 3303
     },
+    "analysis": {
+        "host": "0.0.0.0",
+        "port": 3304
+    },
     "leela": {
         "exec": "/path-to-leela",
         "playouts": 200 // optional

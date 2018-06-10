@@ -10,25 +10,22 @@ import LeelaGoServer, * as LeelaServer from './common/LeelaGoServer';
 import AIManager, { LeelaConfiguration } from './common/AIManager';
 import ReviewServer from './common/ReviewServer';
 import CGOSViewer from './common/CGOSViewer';
+import AnalysisServer from './common/AnalysisServer';
 
+type Host = {
+    host: string;
+    port?: number;
+}
 type Configuration = {
     listen: number,
     host?: string,
     max_players: number,
     leela?: LeelaConfiguration,
     leelazero?: LeelaConfiguration,
-    redis: {
-        host: string;
-        port?: number;
-    },
-    cgos: {
-        host: string;
-        port?: number;
-    },
-    review: {
-        host: string;
-        port?: number;
-    }
+    redis: Host,
+    cgos: Host,
+    review: Host,
+    analysis: Host,
 };
 
 const cpus = os.cpus().length;
@@ -39,7 +36,7 @@ function forkSelf() {
 }
 
 if (cluster.isMaster) {
-    for (let i = 0; i < cpus; i++) {
+    for (let i = 0; i < (1 || cpus); i++) {
         forkSelf();
     }
 } else {
@@ -75,6 +72,8 @@ if (cluster.isMaster) {
         new ReviewServer(client as any);
     });
 
+    const analysis = new AnalysisServer();
+    analysis.start(config.analysis.port, config.analysis.host);
 }
 
 process.title = `deepleela-server-${cluster.isMaster ? 'master' : 'worker'}`;
