@@ -186,7 +186,13 @@ export default class CGOSViewer {
         }
 
         if (this.clients.size === 0) {
-            this.observedGames.clear();
+            let delPending = new Set<string>()
+            this.observedGames.forEach((game, key) => {
+                if (this.matches.find(gid => gid === key)) return;
+                delPending.add(key);
+            });
+
+            delPending.forEach(gid => this.observedGames.delete(gid));
             this.observers.clear();
         }
 
